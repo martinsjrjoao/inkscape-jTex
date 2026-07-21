@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+  <name>jTeX</name>
+  <id>latex_formula</id>
+
+  <param name="latex_code" type="string" appearance="multiline" rows="8" gui-text="LaTeX code:">x^2 + y^2 = z^2</param>
+
+  <param name="mathmode" type="bool" gui-text="Math mode (automatically inserts \[ ... \])">true</param>
+
+  <param name="fontsize" type="optiongroup" appearance="combo" gui-text="Size of base font of the document">
+    <option value="10">10 pt</option>
+    <option value="11">11 pt</option>
+    <option value="12">12 pt</option>
+  </param>
+
+  <param name="scale" type="float" min="0.01" max="100.0" precision="2" gui-text="Additional scaling">1.0</param>
+
+  <param name="preamble" type="string" appearance="multiline" gui-text="Extra packages (one per line):"></param>
+
+  <effect>
+    <object-type>all</object-type>
+    <effects-menu>
+      <submenu name="Text"/>
+    </effects-menu>
+  </effect>
+
+  <preview boolean="false"/>
+  <!-- <effect>
+    <object-type>all</object-type>
+    <effects-menu>
+      <submenu name="LaTeX"/>
+    </effects-menu>
+  </effect> -->
+
+  <script>
+    <command location="inx" interpreter="python">latex_formula.py</command>
+  </script>
+</inkscape-extension>
