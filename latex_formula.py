@@ -163,7 +163,14 @@ class LatexFormula(inkex.EffectExtension):
             vb_w = width
             vb_h, _ = self._split_unit(src_root.get("height", "0pt"))
 
-        px_per_unit = UNIT_TO_PX.get(w_unit, UNIT_TO_PX["pt"])
+        # Converte "1 <unidade do dvisvgm>" para user units DESTE documento.
+        # Isso é essencial: se o documento tem uma escala de página
+        # diferente do padrão (1 user unit = 1/96in), um fator fixo
+        # 96/72 fica errado. unittouu já sabe a escala real do documento.
+        try:
+            px_per_unit = self.svg.unittouu(f"1{w_unit}")
+        except Exception:
+            px_per_unit = UNIT_TO_PX.get(w_unit, UNIT_TO_PX["pt"])
         final_scale = px_per_unit * user_scale
         final_w = vb_w * final_scale
         final_h = vb_h * final_scale
@@ -193,32 +200,48 @@ class LatexFormula(inkex.EffectExtension):
                 continue
             group.append(child)
 
-        # Centraliza na página atual ou na visualização
-        try:
-            # Tenta pegar o centro da tela atual do usuário
-            nv = self.svg.namedview
-            cx = float(nv.get("inkscape:cx", 0))
-            cy = float(nv.get("inkscape:cy", 0))
-            
-            # Se não conseguir os dados de zoom da tela, usa o centro real da página
-            if cx == 0 and cy == 0:
-                viewbox = self.svg.get_viewbox()
-                cx = (viewbox[0] + viewbox[2]) / 2 if viewbox else float(self.svg.viewport_width()) / 2
-                cy = (viewbox[1] + viewbox[3]) / 2 if viewbox else float(self.svg.viewport_height()) / 2
-        except Exception:
-            cx = final_w / 2
-            cy = final_h / 2
+        # Centro de inserção: tenta o centro da área visível (o que o
+        # usuário está vendo na tela); se a API não existir nesta versão
+        # do inkex, cai para o centro geométrico da página. Ambas as
+        # fontes já retornam valores em "user units" do próprio documento,
+        # então funcionam independente da unidade/tamanho de página.
+        cx, cy = self._document_center()
 
-        # Calcula o ponto de inserção para alinhar o CENTRO do LaTeX com o CENTRO da tela/página
-        insert_x = cx - (final_w / 2)
-        insert_y = cy - (final_h / 2)
+        insert_x = cx - final_w / 2.0
+        insert_y = cy - final_h / 2.0
 
-        # Inverte a lógica da escala/translação para neutralizar a origem do dvisvgm
         group.transform = (
             inkex.Transform(f"translate({insert_x},{insert_y})")
             @ inkex.Transform(f"scale({final_scale})")
             @ inkex.Transform(f"translate({-vb_x},{-vb_y})")
         )
+
+    def _document_center(self):
+        """Retorna (cx, cy) em user units do documento, tentando primeiro
+        o centro da área visível atual e, se não for possível, o centro
+        geométrico da página (via viewBox)."""
+        # 1) Centro da visão atual (zoom/pan) — API de mais alto nível.
+        try:
+            center = self.svg.namedview.center
+            return float(center.x), float(center.y)
+        except Exception:
+            pass
+
+        # 2) Centro geométrico da página, direto do viewBox — já em user
+        #    units, então é seguro para qualquer unidade/tamanho de página.
+        try:
+            vb = self.svg.get_viewbox()
+            if vb:
+                return vb[0] + vb[2] / 2.0, vb[1] + vb[3] / 2.0
+        except Exception:
+            pass
+
+        # 3) Último recurso.
+        try:
+            return float(self.svg.viewbox_width) / 2.0, float(self.svg.viewbox_height) / 2.0
+        except Exception:
+            return 0.0, 0.0
+
 
 if __name__ == "__main__":
     LatexFormula().run()
