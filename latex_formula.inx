@@ -8,9 +8,12 @@
   <param name="mathmode" type="bool" gui-text="Math mode (automatically inserts \[ ... \])">true</param>
 
   <param name="fontsize" type="optiongroup" appearance="combo" gui-text="Size of base font of the document">
+    <option value="11">08 pt</option>
+    <option value="12">09 pt</option>
     <option value="10">10 pt</option>
     <option value="11">11 pt</option>
     <option value="12">12 pt</option>
+    <option value="10">14 pt</option>
   </param>
 
   <param name="scale" type="float" min="0.01" max="100.0" precision="2" gui-text="Additional scaling">1.0</param>
