@@ -30,6 +30,18 @@ other vector drawing (Edit nodes, Ungroup, etc.).
 - LaTeX packages `standalone`, `preview`, `amsmath`, `amssymb`, `siunitx`,
   `altsubsup` (included in a full TeX Live / MiKTeX / MacTeX install).
 
+With a minimal install (e.g. BasicTeX on macOS) some of these are missing;
+install them with:
+
+```
+sudo tlmgr install dvisvgm standalone preview siunitx altsubsup
+```
+
+On macOS the extension automatically adds `/Library/TeX/texbin` to the PATH,
+so MacTeX/BasicTeX work even when Inkscape is launched from the Finder. Tools
+installed elsewhere (e.g. Homebrew in `/opt/homebrew/bin`) are not found
+unless Inkscape is started from a terminal that has them in its PATH.
+
 Quick check in a terminal:
 
 ```
@@ -39,10 +51,14 @@ dvisvgm --version
 
 ## Installation
 
-Copy `latex_formula.inx` and `latex_formula.py` into the Inkscape user
-extensions folder:
+Copy the whole `jtex` folder (it contains `latex_formula.inx`,
+`latex_formula.py` and `spacer.png`) into the Inkscape user extensions folder,
+so you end up with e.g. `.../extensions/jtex/latex_formula.inx`:
 
 - **Linux**: `~/.config/inkscape/extensions/`
+  (Flatpak: `~/.var/app/org.inkscape.Inkscape/config/inkscape/extensions/`;
+  note that the Flatpak sandbox cannot see the system's `latex`, so prefer the
+  regular package or AppImage)
 - **macOS**: `~/Library/Application Support/org.inkscape.Inkscape/config/inkscape/extensions/`
 - **Windows**: `%APPDATA%\Inkscape\extensions\`
 
