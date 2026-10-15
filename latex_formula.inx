@@ -3,37 +3,48 @@
   <name>jTeX</name>
   <id>latex_formula</id>
 
-  <param name="latex_code" type="string" appearance="multiline" rows="8" gui-text="LaTeX code:">x^2 + y^2 = z^2</param>
+  <!-- Invisible spacer: forces a wider dialog -->
+  <image width="640" height="1">spacer.png</image>
 
-  <param name="mathmode" type="bool" gui-text="Math mode (automatically inserts \[ ... \])">true</param>
-
-  <param name="fontsize" type="optiongroup" appearance="combo" gui-text="Size of base font of the document">
-    <option value="11">08 pt</option>
-    <option value="12">09 pt</option>
-    <option value="10">10 pt</option>
-    <option value="11">11 pt</option>
-    <option value="12">12 pt</option>
-    <option value="10">14 pt</option>
+  <param name="mode" type="optiongroup" appearance="combo" gui-text="Insert as:">
+    <option value="equation">Equation (wrapped in \[ ... \])</option>
+    <option value="text">Text (inserted as-is)</option>
   </param>
 
-  <param name="scale" type="float" min="0.01" max="100.0" precision="2" gui-text="Additional scaling">1.0</param>
+  <param name="family" type="optiongroup" appearance="combo" gui-text="Font family:">
+    <option value="rmfamily">Roman (serif)</option>
+    <option value="sffamily">Sans serif</option>
+    <option value="ttfamily">Monospace (typewriter)</option>
+  </param>
+
+  <param name="style" type="optiongroup" appearance="combo" gui-text="Font style:">
+    <option value="">Normal</option>
+    <option value="bfseries">Bold</option>
+    <option value="itshape">Italic</option>
+    <option value="slshape">Slanted</option>
+    <option value="scshape">Small caps</option>
+    <option value="bfseries itshape">Bold italic</option>
+  </param>
+
+  <param name="latex_code" type="string" appearance="multiline" gui-text="LaTeX code:">x^2 + y^2 = z^2
+
+
+
+
+</param>
+
+  <hbox>
+    <param name="scale" type="float" min="0.01" max="100.0" precision="2" gui-text="Size factor:">1.0</param>
+  </hbox>
 
   <param name="preamble" type="string" appearance="multiline" gui-text="Extra packages (one per line):"></param>
 
-  <effect>
+  <effect needs-live-preview="false">
     <object-type>all</object-type>
     <effects-menu>
       <submenu name="Text"/>
     </effects-menu>
   </effect>
-
-  <preview boolean="false"/>
-  <!-- <effect>
-    <object-type>all</object-type>
-    <effects-menu>
-      <submenu name="LaTeX"/>
-    </effects-menu>
-  </effect> -->
 
   <script>
     <command location="inx" interpreter="python">latex_formula.py</command>

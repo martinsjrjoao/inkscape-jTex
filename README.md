@@ -1,89 +1,85 @@
-# Fórmula LaTeX — extensão para Inkscape
+# jTeX — LaTeX for Inkscape
 
-Insere código LaTeX no Inkscape (1.0 ou mais recente, testado alvo 1.4+)
-como um grupo de caminhos vetoriais totalmente editáveis, sem depender de
-fontes instaladas. Usa o mesmo backend que o TexText usa por padrão:
+Inserts LaTeX text or equations into Inkscape (1.0 or newer, tested on 1.4+)
+as a group of fully editable vector paths, with no dependency on installed
+fonts. It uses the same backend TexText uses by default:
 `latex` → `.dvi` → `dvisvgm` → SVG.
 
-Como o `dvisvgm` converte os glifos em *paths*, o resultado funciona mesmo
-sem TexText instalado/funcionando, e pode ser editado como qualquer outro
-desenho vetorial (Editar nós, Separar, etc.).
+Since `dvisvgm` converts glyphs to *paths*, the result can be edited like any
+other vector drawing (Edit nodes, Ungroup, etc.).
 
-## Requisitos
+## Features
 
-- LaTeX no PATH do sistema (você já confirmou que tem: `latex`, `pdflatex`).
-- `dvisvgm` no PATH (normalmente já incluído no TeX Live / MiKTeX / MacTeX).
-- Pacotes LaTeX `standalone`, `preview`, `amsmath`, `amssymb` (padrão em
-  qualquer instalação "completa" do TeX Live/MiKTeX/MacTeX).
+- **Equation** mode wraps your code in `\[ ... \]`; **Text** mode inserts it
+  as-is, so you can write plain text (`Hello \textbf{world}`) or take full
+  control of the math mode yourself (`align`, `$...$`, etc.).
+- **Font family** (Roman, Sans serif, Monospace) and **Font style** (Normal,
+  Bold, Italic, Slanted, Small caps, Bold italic) via LaTeX's
+  `\rmfamily`/`\sffamily`/`\ttfamily` and `\bfseries`/`\itshape`/`\slshape`/
+  `\scshape`. In Equation mode they affect text inside the formula (e.g.
+  `\text{...}`); math symbols keep their math fonts unless you use
+  `\mathsf`, `\mathbf`, etc. yourself.
+- Base font size is always 10 pt; use **Scale** to resize.
+- Extra LaTeX packages can be added in the preamble field.
 
-Para conferir rapidamente no terminal:
+## Requirements
+
+- LaTeX in the system PATH (`latex`).
+- `dvisvgm` in the PATH (normally bundled with TeX Live / MiKTeX / MacTeX;
+  otherwise `tlmgr install dvisvgm`).
+- LaTeX packages `standalone`, `preview`, `amsmath`, `amssymb`, `siunitx`,
+  `altsubsup` (included in a full TeX Live / MiKTeX / MacTeX install).
+
+Quick check in a terminal:
 
 ```
 latex --version
 dvisvgm --version
 ```
 
-Se `dvisvgm` não for encontrado, instale o pacote correspondente
-(no TeX Live costuma se chamar `dvisvgm` no gerenciador de pacotes tlmgr,
-ex.: `tlmgr install dvisvgm`).
+## Installation
 
-## Instalação
-
-Copie os dois arquivos (`latex_formula.inx` e `latex_formula.py`) para a
-pasta de extensões de usuário do Inkscape:
+Copy `latex_formula.inx` and `latex_formula.py` into the Inkscape user
+extensions folder:
 
 - **Linux**: `~/.config/inkscape/extensions/`
 - **macOS**: `~/Library/Application Support/org.inkscape.Inkscape/config/inkscape/extensions/`
 - **Windows**: `%APPDATA%\Inkscape\extensions\`
 
-Se não tiver certeza do caminho exato na sua máquina, abra o Inkscape e vá
-em **Editar → Preferências → Sistema**, e veja o campo
-"Extensões do usuário" (User extensions) — ele mostra o caminho exato e
-tem um botão para abrir a pasta direto.
+If unsure about the exact path, open Inkscape and go to
+**Edit → Preferences → System**; the "User extensions" field shows it and has
+a button to open the folder.
 
-Depois de copiar os arquivos, reinicie o Inkscape.
+Restart Inkscape after copying the files.
 
-No Linux/macOS, dê permissão de execução ao script (opcional, mas recomendado):
+## Usage
 
-```
-chmod +x latex_formula.py
-```
+1. Go to **Extensions → Text → jTeX...**
+2. Pick the mode (**Equation** or **Text**) and type your LaTeX code
+   (e.g. `x^2 + y^2 = z^2`, `\frac{a}{b}`, or `Some \textbf{bold} text`).
+3. Set the **Scale** if needed.
+4. Add extra packages in the preamble field if needed, e.g.
+   `\usepackage{mathtools}` or `\usepackage{xcolor}`, one per line.
+5. Click **Apply**. The result is inserted centered in the current view as a
+   group of paths.
 
-## Uso
 
-1. No Inkscape, vá em **Extensões → Texto → Fórmula LaTeX...**
-2. Digite o código LaTeX (ex.: `x^2 + y^2 = z^2`, ou `\frac{a}{b}`, ou até
-   texto normal com `\textbf{negrito}`).
-3. Marque "Modo matemático" se quiser que o código seja envolto
-   automaticamente em `\[ ... \]` (equivalente ao `$$ ... $$`). Desmarque
-   se quiser controlar o modo você mesmo (por exemplo, para inserir texto
-   comum ou uma equação com `align`).
-4. Se precisar de pacotes extras (ex.: `\usepackage{mathtools}` ou
-   `\usepackage{xcolor}`), coloque no campo de preâmbulo, um comando por
-   linha.
-5. Ajuste o tamanho de fonte base e a escala adicional se necessário.
-6. Clique em **Aplicar**. O resultado aparece centralizado na página atual,
-   como um grupo de caminhos.
+## Known limitations
 
-## Limitações conhecidas
+- **No in-place editing**: unlike TexText, this extension cannot reopen an
+  inserted object to edit its source. The original LaTeX code is stored in
+  custom attributes (`data-latex-code`, Base64) on the created group, for
+  reference only. To change a formula, insert it again and replace the old
+  object.
+- LaTeX compilation errors are shown in an Inkscape dialog with the relevant
+  part of the log; missing-package errors appear the same way.
+- Large or complex formulas may take a few seconds, since each Apply runs
+  `latex` and `dvisvgm` from scratch.
 
-- **Não há edição "in-place"**: diferente do TexText, esta extensão não
-  reabre um objeto já inserido para editar o código-fonte. O código LaTeX
-  original fica salvo em atributos personalizados (`data-latex-code`,
-  em Base64) dentro do grupo criado, apenas como referência — para
-  alterar a fórmula, edite o código no diálogo e insira novamente,
-  substituindo o objeto antigo.
-- Erros de compilação do LaTeX são exibidos numa caixa de diálogo do
-  Inkscape com o trecho relevante do log; erros de pacotes ausentes vão
-  aparecer da mesma forma.
-- Fórmulas muito grandes/complexas podem demorar alguns segundos para
-  compilar, já que cada clique em Aplicar chama o `latex` e o `dvisvgm`
-  do zero.
+## Why this works when TexText fails
 
-## Por que isso deve funcionar quando o TexText falha
-
-O TexText depende de uma integração GUI (GTK) própria além do pipeline
-LaTeX. Esta extensão evita essa camada extra: usa apenas os parâmetros
-padrão de extensão do Inkscape (`.inx`) e chama `latex`/`dvisvgm`
-diretamente por `subprocess`, então tende a ter muito menos pontos de
-falha relacionados a bibliotecas gráficas, versões do GTK, etc.
+TexText relies on its own GUI integration (GTK) on top of the LaTeX pipeline.
+This extension avoids that extra layer: it uses only the standard Inkscape
+extension parameters (`.inx`) and calls `latex`/`dvisvgm` directly through
+`subprocess`, so there are far fewer failure points related to graphics
+libraries, GTK versions, etc.

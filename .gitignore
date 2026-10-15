@@ -1,18 +1,16 @@
-# Ambiente virtual
+# macOS / Windows
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
 .venv/
 venv/
 
-# Cache do Python
-__pycache__/
-*.py[cod]
-
-# Arquivos de configuração locais
+# Local config / secrets
 .env
 
-# Arquivos de IDE
+# IDEs
 .vscode/
 .idea/
-
-# Arquivos do sistema
-.DS_Store
-Thumbs.db

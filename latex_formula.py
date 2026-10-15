@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-jTeX - extensão para Inkscape 1.x
+jTeX - Inkscape 1.x extension
 
-Compila um trecho de código LaTeX usando `latex` + `dvisvgm` (o mesmo
-backend usado por padrão pelo TexText) e insere o resultado no documento
-atual como um grupo de caminhos (paths) vetoriais totalmente editáveis
-— não depende de fontes instaladas nem de conexão externa.
+Compiles a piece of LaTeX code using `latex` + `dvisvgm` (the same backend
+TexText uses by default) and inserts the result into the current document
+as a group of fully editable vector paths. It depends on neither installed
+fonts nor an internet connection.
 
-O código-fonte LaTeX original fica guardado em atributos `data-latex-*`
-no grupo criado, para referência futura.
+The original LaTeX source is stored in `data-latex-*` attributes on the
+created group, for future reference.
 """
 
 import base64
@@ -16,13 +16,15 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
+import uuid
 
 import inkex
 from inkex import Group
 from lxml import etree
 
-# Inkscape usa 96 px por polegada; o LaTeX/dvisvgm produz saída em pt (72/pol).
+# Inkscape uses 96 px per inch; LaTeX/dvisvgm output is in pt (72 per inch).
 UNIT_TO_PX = {
     "pt": 96.0 / 72.0,
     "px": 1.0,
@@ -33,14 +35,23 @@ UNIT_TO_PX = {
 
 SVG_NS = "http://www.w3.org/2000/svg"
 
+# Base font size is fixed; use the "scale" option to resize the result.
+FONT_SIZE = 10
+
+# Allowed LaTeX font declarations (the .inx offers a subset of these).
+FAMILIES = {"rmfamily", "sffamily", "ttfamily"}
+STYLES = {"bfseries", "itshape", "slshape", "scshape", "mdseries", "upshape"}
+
+
 
 class LatexFormula(inkex.EffectExtension):
 
     def add_arguments(self, pars):
         pars.add_argument("--latex_code", type=str, default="x^2 + y^2 = z^2")
         pars.add_argument("--preamble", type=str, default="")
-        pars.add_argument("--mathmode", type=inkex.Boolean, default=True)
-        pars.add_argument("--fontsize", type=str, default="12")
+        pars.add_argument("--mode", type=str, default="equation")
+        pars.add_argument("--family", type=str, default="rmfamily")
+        pars.add_argument("--style", type=str, default="")
         pars.add_argument("--scale", type=float, default=1.0)
 
     def effect(self):
@@ -50,33 +61,44 @@ class LatexFormula(inkex.EffectExtension):
 
         code = (self.options.latex_code or "").strip()
         preamble = self.options.preamble or ""
-        mathmode = self.options.mathmode
-        fontsize = self.options.fontsize
+        mathmode = self.options.mode != "text"
         user_scale = self.options.scale
 
         if not code:
-            raise inkex.AbortExtension("Nenhum código LaTeX foi informado.")
+            raise inkex.AbortExtension("No LaTeX code was provided.")
 
         latex_bin = shutil.which("latex")
         dvisvgm_bin = shutil.which("dvisvgm")
 
         if latex_bin is None:
             raise inkex.AbortExtension(
-                "O executável 'latex' não foi encontrado no PATH do sistema.\n"
-                "Verifique se o TeX Live / MiKTeX / MacTeX está instalado "
-                "e acessível a partir do Inkscape."
+                "The 'latex' executable was not found in the system PATH.\n"
+                "Check that TeX Live / MiKTeX / MacTeX is installed "
+                "and reachable from Inkscape."
             )
         if dvisvgm_bin is None:
             raise inkex.AbortExtension(
-                "O executável 'dvisvgm' não foi encontrado no PATH do sistema.\n"
-                "Ele normalmente já vem junto com o TeX Live / MiKTeX / MacTeX; "
-                "verifique sua instalação."
+                "The 'dvisvgm' executable was not found in the system PATH.\n"
+                "It normally ships with TeX Live / MiKTeX / MacTeX; "
+                "check your installation."
             )
 
+        # Equation mode wraps the code in display math; text mode inserts it as-is.
         content = f"\\[ {code} \\]" if mathmode else code
 
+        # Font family / style declarations (see Overleaf's "Font sizes,
+        # families, and styles"). Only whitelisted values reach the LaTeX source.
+        decls = ""
+        if self.options.family in FAMILIES:
+            decls += "\\" + self.options.family + " "
+        for style in self.options.style.split():
+            if style in STYLES:
+                decls += "\\" + style + " "
+        if decls:
+            content = "{" + decls + content + "}"
+
         tex_source = (
-            f"\\documentclass[{fontsize}pt,preview,border=2pt]{{standalone}}\n"
+            f"\\documentclass[{FONT_SIZE}pt,preview,border=2pt]{{standalone}}\n"
             "\\usepackage{amsmath}\n"
             "\\usepackage{amssymb}\n"
             "\\usepackage{siunitx}\n"
@@ -125,22 +147,44 @@ class LatexFormula(inkex.EffectExtension):
                     + (proc.stderr or "")[-2000:]
                 )
 
-            self._insert_svg(svg_path, code, preamble, mathmode, fontsize, user_scale)
+            self._insert_svg(svg_path, code, preamble, mathmode, user_scale)
 
     # ------------------------------------------------------------------
-    # Utilitários
+    # Utilities
     # ------------------------------------------------------------------
 
     @staticmethod
     def _extract_latex_error(log_path):
         if not os.path.exists(log_path):
-            return "It was not possible to read the log of the LaTeX."
+            return "Could not read the LaTeX log."
         with open(log_path, "r", encoding="utf-8", errors="ignore") as fh:
             log = fh.read()
         errors = re.findall(r"^! .*(?:\n.*){0,4}", log, re.MULTILINE)
         if errors:
             return "\n\n".join(errors[:3])
         return log[-1500:]
+
+    @staticmethod
+    def _make_ids_unique(root):
+        """dvisvgm names glyphs like "g0-97" in every run, so ids from
+        different insertions would collide in the document's <defs> (the
+        first definition wins, e.g. an italic math "a" replacing a text "a").
+        Prefix every id, and every reference to it, with a unique token."""
+        prefix = "jtex" + uuid.uuid4().hex[:8] + "-"
+        ids = {el.get("id") for el in root.iter() if el.get("id")}
+        for el in root.iter():
+            if not isinstance(el.tag, str):
+                continue
+            if el.get("id"):
+                el.set("id", prefix + el.get("id"))
+            for attr, val in list(el.attrib.items()):
+                if attr.endswith("href") and val.startswith("#") and val[1:] in ids:
+                    el.set(attr, "#" + prefix + val[1:])
+                elif "url(#" in val:
+                    el.set(attr, re.sub(
+                        r"url\(#([^)]+)\)",
+                        lambda m: "url(#%s%s)" % (prefix, m.group(1)) if m.group(1) in ids else m.group(0),
+                        val))
 
     @staticmethod
     def _split_unit(value):
@@ -150,9 +194,10 @@ class LatexFormula(inkex.EffectExtension):
         num, unit = match.groups()
         return float(num), (unit or "pt")
 
-    def _insert_svg(self, svg_path, code, preamble, mathmode, fontsize, user_scale):
+    def _insert_svg(self, svg_path, code, preamble, mathmode, user_scale):
         tree = etree.parse(svg_path)
         src_root = tree.getroot()
+        self._make_ids_unique(src_root)
 
         width, w_unit = self._split_unit(src_root.get("width", "0pt"))
         vb = src_root.get("viewBox")
@@ -163,10 +208,10 @@ class LatexFormula(inkex.EffectExtension):
             vb_w = width
             vb_h, _ = self._split_unit(src_root.get("height", "0pt"))
 
-        # Converte "1 <unidade do dvisvgm>" para user units DESTE documento.
-        # Isso é essencial: se o documento tem uma escala de página
-        # diferente do padrão (1 user unit = 1/96in), um fator fixo
-        # 96/72 fica errado. unittouu já sabe a escala real do documento.
+        # Convert "1 <dvisvgm unit>" to user units of THIS document. This is
+        # essential: if the document has a non-default page scale
+        # (1 user unit != 1/96in), a fixed 96/72 factor would be wrong.
+        # unittouu knows the document's real scale.
         try:
             px_per_unit = self.svg.unittouu(f"1{w_unit}")
         except Exception:
@@ -179,32 +224,30 @@ class LatexFormula(inkex.EffectExtension):
         group = layer.add(Group())
         group.set("inkscape:label", "LaTeX: " + code[:60])
 
-        # Guarda o código original para referência / futura edição manual.
+        # Keep the original code for reference / future manual editing.
         group.set("data-latex-code", base64.b64encode(code.encode("utf-8")).decode("ascii"))
         group.set("data-latex-preamble", base64.b64encode(preamble.encode("utf-8")).decode("ascii"))
         group.set("data-latex-mathmode", "1" if mathmode else "0")
-        group.set("data-latex-fontsize", str(fontsize))
 
-        # Move definições (defs) do SVG gerado para o defs do documento atual.
+        # Move the generated SVG's defs into the current document's defs.
         defs_src = src_root.find(f"{{{SVG_NS}}}defs")
         if defs_src is not None:
             doc_defs = self.svg.defs
             for child in list(defs_src):
                 doc_defs.append(child)
 
-        # Move o conteúdo visível (grupos/paths/use) para dentro do novo grupo.
+        # Move the visible content (groups/paths/use) into the new group.
         for child in list(src_root):
             if not isinstance(child.tag, str):
-                continue  # ignora comentários / instruções de processamento
+                continue  # skip comments / processing instructions
             if etree.QName(child).localname == "defs":
                 continue
             group.append(child)
 
-        # Centro de inserção: tenta o centro da área visível (o que o
-        # usuário está vendo na tela); se a API não existir nesta versão
-        # do inkex, cai para o centro geométrico da página. Ambas as
-        # fontes já retornam valores em "user units" do próprio documento,
-        # então funcionam independente da unidade/tamanho de página.
+        # Insertion point: the center of the visible area (what the user
+        # sees on screen); if the API is missing in this inkex version, fall
+        # back to the page center. Both return the document's own user units,
+        # so they work regardless of page unit/size.
         cx, cy = self._document_center()
 
         insert_x = cx - final_w / 2.0
@@ -217,18 +260,16 @@ class LatexFormula(inkex.EffectExtension):
         )
 
     def _document_center(self):
-        """Retorna (cx, cy) em user units do documento, tentando primeiro
-        o centro da área visível atual e, se não for possível, o centro
-        geométrico da página (via viewBox)."""
-        # 1) Centro da visão atual (zoom/pan) — API de mais alto nível.
+        """Return (cx, cy) in document user units: the center of the current
+        view if available, otherwise the page center (via viewBox)."""
+        # 1) Center of the current view (zoom/pan) - highest-level API.
         try:
             center = self.svg.namedview.center
             return float(center.x), float(center.y)
         except Exception:
             pass
 
-        # 2) Centro geométrico da página, direto do viewBox — já em user
-        #    units, então é seguro para qualquer unidade/tamanho de página.
+        # 2) Page center straight from the viewBox - already in user units.
         try:
             vb = self.svg.get_viewbox()
             if vb:
@@ -236,7 +277,7 @@ class LatexFormula(inkex.EffectExtension):
         except Exception:
             pass
 
-        # 3) Último recurso.
+        # 3) Last resort.
         try:
             return float(self.svg.viewbox_width) / 2.0, float(self.svg.viewbox_height) / 2.0
         except Exception:
