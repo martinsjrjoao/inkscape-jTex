@@ -79,6 +79,38 @@ Restart Inkscape after copying the files.
 5. Click **Apply**. The result is inserted centered in the current view as a
    group of paths.
 
+### TikZ / pgfplots
+
+TikZ and pgfplots work in **Text** mode (not Equation, which wraps the code in
+`\[ ... \]`). Because the pipeline goes through DVI, TikZ needs the
+`dvisvgm` driver, which must be selected *before* TikZ is loaded. Put this in
+the **Extra packages** field:
+
+```
+\def\pgfsysdriver{pgfsys-dvisvgm.def}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=newest}
+```
+
+Then paste the whole `tikzpicture` (including `\begin{tikzpicture}` and
+`\end{tikzpicture}`) in the **LaTeX code** field:
+
+```
+\begin{tikzpicture}
+  \begin{axis}[axis lines=middle, xlabel={$x$}, ylabel={$y$}]
+    \addplot[blue, thick] {x^2};
+  \end{axis}
+\end{tikzpicture}
+```
+
+Notes:
+
+- `pgfplots` already loads `tikz`; for plain TikZ drawings (no `axis`) you can
+  load only `tikz`, but the driver line is still required.
+- `dvisvgm` may print "PostScript specials ignored"; the result is still
+  correct.
+- Without the driver line, parts of the drawing can be missing from the SVG.
 
 ## Known limitations
 
