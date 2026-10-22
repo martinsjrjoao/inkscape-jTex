@@ -59,8 +59,8 @@ class LatexFormula(inkex.EffectExtension):
         if os.path.exists(macos_path) and macos_path not in os.environ["PATH"]:
             os.environ["PATH"] += os.pathsep + macos_path
 
-        code = (self.options.latex_code or "").strip()
-        preamble = self.options.preamble or ""
+        code = self._decode_newlines(self.options.latex_code or "").strip()
+        preamble = self._decode_newlines(self.options.preamble or "")
         mathmode = self.options.mode != "text"
         user_scale = self.options.scale
 
@@ -152,6 +152,14 @@ class LatexFormula(inkex.EffectExtension):
     # ------------------------------------------------------------------
     # Utilities
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _decode_newlines(text):
+        """Inkscape passes multiline fields with line breaks as a literal
+        backslash + "n". Turn those back into real newlines, but only when
+        followed by a backslash, whitespace or the end, so LaTeX commands
+        such as \\newcommand or \\node are left alone."""
+        return re.sub(r"\\n(?=\\|\s|$)", "\n", text)
 
     @staticmethod
     def _extract_latex_error(log_path):
